@@ -92,11 +92,13 @@ def query(request: QueryRequest):
             "sources": final_output.get("documents", [])
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         logfire.error(f"❌ Backend Execution Failed: {e}")
         return {
             "question": q,
             "answer": "I apologize, but I encountered an internal error while processing your request. Please try again later.",
-            "thought_process": ["Error encountered during execution."],
+            "thought_process": [f"Error: {type(e).__name__}: {str(e)}"],
             "status": "error",
             "sources": []
         }

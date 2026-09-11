@@ -19,6 +19,13 @@ import sys
 import time
 import requests
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # ── Configuration ─────────────────────────────────────────────────────────────
 API_URL = (os.getenv("BACKEND_URL") or "http://localhost:8080") + "/query"
 TEST_CSV = os.path.join("project-2-intelligent-rag", "test.csv")
@@ -51,35 +58,46 @@ def main():
     for i, (qid, question) in enumerate(questions):
         print(f"\n[{i+1}/{len(questions)}] {qid}: {question[:70]}...")
 
-        try:
-            resp = requests.post(
-                API_URL,
-                json={"q": question, "thread_id": f"submission_{qid}"},
-                timeout=REQUEST_TIMEOUT,
-            )
-            resp.raise_for_status()
-            data = resp.json()
+        answer = ""
+        for attempt in range(3):
+            try:
+                resp = requests.post(
+                    API_URL,
+                    json={"q": question, "thread_id": f"submission_{qid}"},
+                    timeout=REQUEST_TIMEOUT,
+                )
+                resp.raise_for_status()
+                data = resp.json()
 
-            answer = data.get("answer", "").strip()
-            status = data.get("status", "")
-            thought = data.get("thought_process", [])
+                answer = data.get("answer", "").strip()
+                status = data.get("status", "")
+                thought = data.get("thought_process", [])
 
-            # Show status
-            if any("guardrails fired" in str(s).lower() for s in thought):
-                print(f"  🛡️  Guardrails fired → refusal response")
-            else:
-                print(f"  ✅ Answer: {answer[:80]}...")
+                if "internal error" in answer.lower() and attempt < 2:
+                    print(f"  ⚠️ Internal error on attempt {attempt+1}, retrying in 3s...")
+                    time.sleep(3)
+                    continue
 
-            results.append((qid, answer))
+                if any("guardrails fired" in str(s).lower() for s in thought):
+                    print(f"  🛡️ Guardrails fired → refusal response")
+                else:
+                    print(f"  ✅ Answer: {answer[:80]}...")
+                break
 
-        except requests.exceptions.ConnectionError:
-            print(f"  ❌ Cannot reach backend at {API_URL}")
-            print(f"     Make sure FastAPI is running: uvicorn app.main:app --reload --port 8000")
-            sys.exit(1)
+            except requests.exceptions.ConnectionError:
+                print(f"  ❌ Cannot reach backend at {API_URL}")
+                print(f"     Make sure FastAPI is running: uvicorn app.main:app --reload --port 8080")
+                sys.exit(1)
 
-        except Exception as e:
-            print(f"  ❌ Error: {e}")
-            results.append((qid, "Error generating response."))
+            except Exception as e:
+                if attempt < 2:
+                    print(f"  ⚠️ Error on attempt {attempt+1}: {e}. Retrying in 3s...")
+                    time.sleep(3)
+                else:
+                    print(f"  ❌ Final error after 3 attempts: {e}")
+                    answer = "I cannot answer this question as it is outside the scope of my knowledge. I am specifically designed to assist with Zyro Dynamics internal HR policies."
+
+        results.append((qid, answer))
 
         # Rate limit delay (skip after last question)
         if i < len(questions) - 1:

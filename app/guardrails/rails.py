@@ -9,19 +9,17 @@ from app.guardrails.colang_rules import COLANG_CONTENT, YAML_CONTENT, RAIL_INDIC
 _rails: LLMRails | None = None
 
 
+from app.gateway.client import get_langchain_llm
+
+
 def initialize_rails() -> None:
     """
     Build the NeMo LLMRails singleton at app startup.
-    Uses fast gpt-oss-20b for intent classification at the gate.
+    Uses Portkey gateway LLM for intent classification at the gate.
     """
     global _rails
 
-    guard_llm = ChatOpenAI(
-        api_key=settings.GROQ_API_KEY,
-        base_url="https://api.groq.com/openai/v1",
-        model="openai/gpt-oss-20b",
-        temperature=0
-    )
+    guard_llm = get_langchain_llm("guardrails")
 
     config = RailsConfig.from_content(
         colang_content=COLANG_CONTENT,
@@ -29,7 +27,7 @@ def initialize_rails() -> None:
     )
 
     _rails = LLMRails(config, llm=guard_llm)
-    logfire.info("🛡️ NeMo Guardrails initialised (openai/gpt-oss-20b).")
+    logfire.info("🛡️ NeMo Guardrails initialised with Gateway LLM.")
     
     
 
@@ -52,11 +50,38 @@ def guard(message: str) -> tuple[bool, str | None]:
 
         # NeMo returns {'role': 'assistant', 'content': '...'} — extract text
         content = result.get("content", "") if isinstance(result, dict) else str(result)
+        normalized = content.replace("’", "'").replace("‘", "'").lower()
 
-        fired = any(indicator in content for indicator in RAIL_INDICATORS)
+        is_refusal = any(
+            phrase in normalized
+            for phrase in (
+                "can't help with that",
+                "cannot help with that",
+                "cannot answer this question",
+                "outside the scope",
+                "outside of my",
+                "i'm sorry, but i can't",
+                "i am sorry, but i cannot",
+                "consistent guidelines",
+                "only help with company hr policies",
+                "specifically designed to assist with zyro dynamics",
+                "can only provide information",
+                "only provide information about zyro dynamics",
+                "don't have access to zoho",
+                "do not have access to zoho",
+            )
+        )
+
+        fired = is_refusal or any(indicator.lower() in normalized for indicator in RAIL_INDICATORS)
 
         if fired:
             logfire.info(f"🛡️ Guardrails fired | query='{message[:80]}'")
+            if is_refusal:
+                return True, (
+                    "I cannot answer this question as it is outside the scope of my knowledge. "
+                    "I am specifically designed to assist with Zyro Dynamics internal HR policies, "
+                    "such as leave, compensation, code of conduct, performance reviews, travel, and onboarding."
+                )
             return True, content
 
         logfire.info("✅ Guardrails passed.")

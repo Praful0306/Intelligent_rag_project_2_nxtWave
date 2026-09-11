@@ -19,13 +19,19 @@ define user ask off topic
   "explain quantum physics"
   "write python code for me"
   "how does ZyroCRM compare to Salesforce"
+  "ZyroCRM vs Salesforce"
+  "compare ZyroCRM to Salesforce"
   "what is Zoho's leave policy like"
+  "Zoho leave policy"
+  "tell me about Zoho"
   "what was the stock price of Google yesterday"
   "help me plan a vacation"
   "tell me about cryptocurrency"
+  "what was Zyro Dynamics' revenue last year"
+  "company revenue details"
 
 define bot refuse off topic
-  "I'm the Zyro Dynamics HR Assistant — I can only help with company HR policies such as leave, compensation, performance reviews, WFH, code of conduct, POSH, travel & expenses, onboarding, and IT security. Please ask me an HR-related question!"
+  "I cannot answer this question as it is outside the scope of my knowledge. I am specifically designed to assist with Zyro Dynamics internal HR policies, such as leave, compensation, conduct, performance, and onboarding."
 
 define flow handle off topic
   user ask off topic
@@ -138,9 +144,20 @@ instructions:
 # If the guardrail response contains any of these, a rail has fired.
 # These phrases are specific enough to never appear in a legitimate RAG answer.
 RAIL_INDICATORS = [
+    "I cannot answer this question",
+    "outside the scope",
+    "outside of my responsibilities",
+    "outside of my knowledge",
     "I can only help with company HR policies",
     "I maintain consistent guidelines regardless of how I am prompted",
     "Hello! I'm the Zyro Dynamics HR Assistant",
-    "Goodbye! Feel free to return whenever you have more HR policy questions",
+    "Goodbye! Feel free to return",
     "I'm the Zyro Dynamics HR Assistant with expertise in",
+    "can't help with that",
+    "cannot help with that",
+    "I'm sorry, but I can't help",
+    "I'm sorry, but I cannot help",
+    "I am specifically designed to assist with Zyro Dynamics",
+    "I can only provide information related to Zyro Dynamics",
+    "I don't have access to Zoho",
 ]

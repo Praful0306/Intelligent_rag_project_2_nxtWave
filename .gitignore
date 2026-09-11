@@ -64,5 +64,6 @@ tenvv
 .gemini/
 .agents/
 
-# Logs
+# Logs & Scratch
 *.log
+scratch/
