@@ -17,17 +17,41 @@ GATEWAY_CONFIG = {
         "on_status_codes": [429, 503]
     },
     "targets": [
-        {"override_params": {"model": f"@{settings.GROQ_SLUG}/llama-3.3-70b-versatile"}},
-        {"override_params": {"model": f"@{settings.GROQ_SLUG_2}/llama-3.1-8b-instant"}},
+        {"override_params": {"model": f"@{settings.GROQ_SLUG}/{settings.GROQ_MODEL}"}},
+        {"override_params": {"model": f"@{settings.GROQ_SLUG_2}/qwen/qwen3.8-27b"}},
     ]
 }
 
 from openai import OpenAI
 
 if settings.PORTKEY_API_KEY:
-    portkey_client = Portkey(
-        api_key=settings.PORTKEY_API_KEY,
-        config=GATEWAY_CONFIG
+    _raw_portkey = Portkey(api_key=settings.PORTKEY_API_KEY)
+
+    class PortkeyClientWrapper:
+        def __init__(self, raw_client, default_model: str):
+            self._client = raw_client
+            self.default_model = default_model
+
+        class _Chat:
+            def __init__(self, parent):
+                self.completions = parent._Completions(parent)
+
+        class _Completions:
+            def __init__(self, parent):
+                self.parent = parent
+
+            def create(self, **kwargs):
+                if "model" not in kwargs or not kwargs["model"]:
+                    kwargs["model"] = self.parent.default_model
+                return self.parent._client.chat.completions.create(**kwargs)
+
+        @property
+        def chat(self):
+            return self._Chat(self)
+
+    portkey_client = PortkeyClientWrapper(
+        _raw_portkey,
+        default_model=f"@{settings.GROQ_SLUG}/{settings.GROQ_MODEL}"
     )
 else:
     class DirectGroqCompletions:
@@ -64,11 +88,10 @@ def get_langchain_llm(feature: str = "rag") -> ChatOpenAI:
         return ChatOpenAI(
             api_key=settings.PORTKEY_API_KEY,
             base_url=PORTKEY_GATEWAY_URL,
-            model=f"@{settings.GROQ_SLUG}/llama-3.3-70b-versatile",
+            model=f"@{settings.GROQ_SLUG}/{settings.GROQ_MODEL}",
             temperature=0,
             default_headers=createHeaders(
                 api_key=settings.PORTKEY_API_KEY,
-                config=GATEWAY_CONFIG,
                 metadata={
                     "feature": feature,
                     "_user": "rag-system",
