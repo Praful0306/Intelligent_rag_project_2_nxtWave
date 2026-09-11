@@ -20,7 +20,7 @@ import time
 import requests
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-API_URL = os.getenv("BACKEND_URL", "http://localhost:8000") + "/query"
+API_URL = (os.getenv("BACKEND_URL") or "http://localhost:8000") + "/query"
 TEST_CSV = os.path.join("project-2-intelligent-rag", "test.csv")
 OUTPUT_CSV = "submission.csv"
 REQUEST_TIMEOUT = 120   # seconds — guardrails + LangGraph + Groq can take >60s
